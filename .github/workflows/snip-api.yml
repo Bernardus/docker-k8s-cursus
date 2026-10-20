@@ -3,9 +3,9 @@ name: snip-api
 on:
   push:
     branches: [main]
-    paths: ["app/api/**", ".github/workflows/snip-api.yml"]
+    paths: ["app/**", ".github/workflows/snip-api.yml"]
   pull_request:
-    paths: ["app/api/**", ".github/workflows/snip-api.yml"]
+    paths: ["app/**", ".github/workflows/snip-api.yml"]
   workflow_dispatch: # handmatig starten vanuit het Actions-tabblad
 
 permissions:
@@ -15,16 +15,20 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.versie.outputs.version }} # doorgeven aan de deploy-job
     steps:
       # Alle actions zijn vastgepind op een commit-SHA, niet op een tag. Tags kunnen worden
       # verplaatst (zie het Trivy-incident van maart 2026), een SHA niet.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Naam en versie bepalen
+        id: versie
         run: |
           # GHCR accepteert alleen kleine letters in image-namen.
           echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/snip-api" >> "$GITHUB_ENV"
           echo "VERSION=sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          echo "version=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Tags en labels bepalen
         id: meta
@@ -76,3 +80,56 @@ jobs:
           build-args: APP_VERSION=${{ env.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build # pas na een geslaagde build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    environment:
+      name: production
+      url: https://${{ vars.SNIP_DOMAIN }}
+    concurrency: production # nooit twee deploys tegelijk
+    env:
+      HOST: ${{ vars.DEPLOY_HOST }}
+      DOMAIN: ${{ vars.SNIP_DOMAIN }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: SSH klaarzetten
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Bestanden naar de server
+        run: |
+          rsync -av --delete app/web app/db "deploy@$HOST:snip/"
+          rsync -av app/Caddyfile "deploy@$HOST:snip/Caddyfile"
+          rsync -av app/compose.server.yaml "deploy@$HOST:snip/compose.yaml"
+
+      - name: Nieuwe versie starten
+        run: |
+          # $VERSION wordt bewust hier al ingevuld, vóór het commando naar de server gaat.
+          # shellcheck disable=SC2029
+          ssh "deploy@$HOST" "cd snip \
+            && sed -i '/^SNIP_VERSION=/d' .env \
+            && echo 'SNIP_VERSION=$VERSION' >> .env \
+            && docker compose pull --quiet \
+            && docker compose up -d --remove-orphans"
+
+      - name: Controleren of de nieuwe versie draait
+        run: |
+          for _ in $(seq 1 20); do
+            if curl -fsS "https://$DOMAIN/api/info" | grep -q "\"versie\":\"$VERSION\""; then
+              echo "✔ $VERSION draait op https://$DOMAIN"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "✘ na 60 seconden draait $VERSION nog niet op https://$DOMAIN"
+          exit 1
