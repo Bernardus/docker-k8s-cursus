@@ -37,8 +37,8 @@ secrets, caching, healthchecks en schalen.
 | | 03 | [Je eerste eigen image](modules/03-eigen-image/): Dockerfile, layers, multi-stage (de `api`) | ✅ klaar |
 | | 04 | [Compose](modules/04-compose/) (`podman compose`): de hele app met één commando | ✅ klaar |
 | | 05 | [Productierijp image + eerste CI](modules/05-productierijp-en-ci/): GitHub Actions bouwt, scant en pusht naar GHCR | ✅ klaar |
-| | 06 | Je eigen server: VPS bij Hetzner, SSH, firewall, Docker, snip online met Compose | 🔜 |
-| | 07 | Automatisch deployen: GitHub Actions → server via SSH, HTTPS met sslip.io | 🔜 |
+| | 06 | [Je eigen server](modules/06-eigen-server/): droplet bij DigitalOcean, SSH, firewall, Docker, snip online met Compose | ✅ klaar |
+| | 07 | [Automatisch deployen](modules/07-automatisch-deployen/): GitHub Actions → server via SSH, HTTPS met Caddy en sslip.io | ✅ klaar |
 | **2 · Kubernetes** (lokaal, op Podman) | 08 | Waarom Kubernetes + architectuur; van Podman-pod naar lokaal cluster `CKAD` | 🔜 |
 | | 09 | Pods, Deployments, rolling updates, rollback `CKAD` | 🔜 |
 | | 10 | Services, Ingress & Gateway API `CKAD` | 🔜 |
@@ -50,7 +50,7 @@ secrets, caching, healthchecks en schalen.
 | | 16 | Debuggen als een pro: events, logs, k9s, klassieke fouten `CKAD` | 🔜 |
 | **3 · GitOps met Argo CD** (lokaal) | 17 | Argo CD: Applications, sync, self-heal, rollback | 🔜 |
 | | 18 | CI + CD: Actions bouwt → nieuwe tag in Git → Argo CD rolt uit, met omgevingen dev/prod | 🔜 |
-| **4 · Live met Kubernetes** | 19 | **4a** k3s op je VPS (dezelfde als in module 06): HTTPS met cert-manager | 🔜 |
+| **4 · Live met Kubernetes** | 19 | **4a** k3s op je droplet (dezelfde als in module 06): HTTPS met cert-manager | 🔜 |
 | | 20 | **4b** AKS met Terraform: ACR, OIDC vanuit GitHub, wegwerpcluster | 🔜 |
 | | 21 | **4b** Azure-integraties: Workload Identity, Key Vault + External Secrets, Gateway API | 🔜 |
 | **5 · Zo werkt het in een enterprise** | 22 | Platformteam vs. app-team + centrale workflows (reusable workflows, composite actions, environments met goedkeuring) | 🔜 |
@@ -108,7 +108,7 @@ Loop je vast, open dan Claude in deze map en vraag om hulp. Plak de foutmelding 
 |---|---|---|
 | Podman + Podman Desktop | vanaf 00 | €0 (open source) |
 | GitHub, Actions, GHCR, een eigen GitHub-organisatie | vanaf 05 | €0 met publieke repo's (zie hieronder) |
-| VPS bij Hetzner (2 vCPU / 4 GB) | modules 06–07 en 19 | ca. €6–7 per maand incl. IPv4-adres; je kunt hem tussendoor weggooien |
+| Droplet bij DigitalOcean | modules 06–07 en 19 | $12 per maand (1 vCPU / 2 GB), voor k3s in module 19 opschalen naar $24 (2 vCPU / 4 GB). Per seconde afgerekend; weggooien als je hem niet gebruikt |
 | Azure (AKS + ACR) | 4b en 23 | $200 gratis tegoed voor nieuwe accounts (30 dagen). Daarna kost een wegwerpcluster centen per uur. Een cluster dat altijd aanstaat kost ca. $50–60 per maand. |
 | Domeinnaam | optioneel | €0 met `sslip.io`, of ca. €1–15 per jaar |
 | CKAD-examen | optioneel | $445 (ca. €380–400), vaak 30–50% korting rond Black Friday |
@@ -121,9 +121,9 @@ Loop je vast, open dan Claude in deze map en vraag om hulp. Plak de foutmelding 
   ook op het gratis plan beschikbaar. *Required workflows* (centrale workflows die je
   organisatie-breed afdwingt) zijn een Enterprise-functie. Die leggen we uit, maar je kunt ze
   thuis niet nabouwen.
-- **VPS:** we gebruiken Hetzner (CX23 of CAX11). De markt is in 2026 onrustig: Hetzner heeft
-  de prijzen verhoogd en de goedkope servers zijn soms uitverkocht. Kies dan een andere locatie,
-  of wacht een dag. Alternatieven: netcup of Contabo.
+- **Server:** we gebruiken een droplet bij DigitalOcean. Hetzner en netcup zijn goedkoper, maar
+  vragen bij nieuwe accounts soms om een identiteitscontrole. Een uitgezette droplet kost nog
+  steeds geld; alleen een verwijderde niet.
 
 ## Certificaat nodig?
 

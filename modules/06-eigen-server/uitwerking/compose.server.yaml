@@ -1,7 +1,8 @@
 # compose.yaml voor de server. Verschillen met de lokale versie:
-#   - api komt als kant-en-klaar image uit GHCR (er wordt op de server niets gebouwd)
+#   - api komt als kant-en-klaar image uit GHCR (op de server wordt niets gebouwd)
 #   - restart: unless-stopped, zodat alles na een reboot vanzelf terugkomt
-#   - web op poort 80, het standaardpoortnummer voor http
+#   - web op poort 80, de standaardpoort voor http
+#   - wachtwoord verplicht: zonder .env stopt Compose met een duidelijke melding
 #   - geen adminer
 name: snip
 

@@ -375,7 +375,7 @@ Een collega haalt je repo op en start meteen. Speel dat na:
 podman compose --profile tools down -v
 mv .env .env.weg
 podman compose up -d
-podman compose ps -a
+podman compose ps
 ```
 
 <details>

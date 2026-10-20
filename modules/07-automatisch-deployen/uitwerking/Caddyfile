@@ -1,0 +1,6 @@
+# Caddy is de voordeur van snip: hij regelt HTTPS (certificaat aanvragen en verlengen)
+# en stuurt alles door naar nginx. {$SNIP_DOMAIN} komt uit .env op de server.
+{$SNIP_DOMAIN} {
+	encode
+	reverse_proxy web:80
+}
