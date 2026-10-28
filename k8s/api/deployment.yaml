@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snip-api
+  labels:
+    app: snip-api
+  annotations:
+    kubernetes.io/change-cause: "nieuwe ondertitel (sha-4000a15)"
+spec:
+  replicas: 3                     # zoveel kopieën
+  selector:
+    matchLabels:
+      app: snip-api               # deze pods zijn van mij...
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                 # tijdelijk één extra
+      maxUnavailable: 0           # nooit minder dan 3
+  template:                       # ...en zo maak ik ze:
+    metadata:
+      labels:
+        app: snip-api             # (moet passen bij de selector)
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/bernardus/snip-api:sha-4000a15
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DB_PASSWORD                # uit de Secret...
+              valueFrom:
+                secretKeyRef:
+                  name: snip-db
+                  key: password
+            - name: DATABASE_URL               # ...en hier ingevuld met $(DB_PASSWORD)
+              value: postgres://postgres:$(DB_PASSWORD)@snip-db:5432/snip
+

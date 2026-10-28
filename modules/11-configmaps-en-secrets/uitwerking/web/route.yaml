@@ -1,0 +1,16 @@
+# Al het andere gaat naar de website.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: snip-web
+spec:
+  parentRefs:
+    - name: snip
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: snip-web
+          port: 80

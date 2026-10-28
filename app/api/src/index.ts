@@ -13,6 +13,10 @@ const host = process.env.HOST ?? '0.0.0.0'
 const version = process.env.APP_VERSION ?? 'dev'
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL })
 
+// Valt de database weg (herstart, nieuwe pod), dan breekt een open verbinding af. Zonder deze
+// regel crasht de hele app daarop; nu loggen we het en maakt de pool later een nieuwe verbinding.
+db.on('error', (err) => console.error('databaseverbinding verbroken:', foutTekst(err)))
+
 const app = new Hono()
 
 // Leesbare foutmelding, ook als er meerdere pogingen mislukten (bijv. IPv4 én IPv6).

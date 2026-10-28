@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snip-web
+  labels:
+    app: snip-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: snip-web
+  template:
+    metadata:
+      labels:
+        app: snip-web
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.29-alpine
+          ports:
+            - containerPort: 80
+          readinessProbe:              # geeft nginx de pagina?
+            httpGet:
+              path: /
+              port: 80
+          livenessProbe:               # luistert nginx nog?
+            tcpSocket:
+              port: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: site
+              mountPath: /usr/share/nginx/html
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+      volumes:
+        - name: site
+          configMap:
+            name: snip-web-site
+        - name: nginx-config
+          configMap:
+            name: snip-web-nginx

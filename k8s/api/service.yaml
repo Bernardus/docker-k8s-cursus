@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: snip-api
+spec:
+  selector:
+    app: snip-api        # stuur verkeer naar alle pods met dit etiket
+  ports:
+    - port: 80           # de poort van de Service zelf
+      targetPort: 3000   # de poort waarop de API in de pod luistert

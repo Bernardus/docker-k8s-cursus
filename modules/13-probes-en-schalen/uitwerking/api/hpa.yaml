@@ -1,0 +1,18 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: snip-api
+spec:
+  scaleTargetRef:                # wat schalen we?
+    apiVersion: apps/v1
+    kind: Deployment
+    name: snip-api
+  minReplicas: 2                 # nooit minder dan 2
+  maxReplicas: 6                 # nooit meer dan 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50   # gemiddeld 50% van de cpu-request

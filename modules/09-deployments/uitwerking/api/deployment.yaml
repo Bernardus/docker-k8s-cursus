@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snip-api
+  labels:
+    app: snip-api
+  annotations:
+    kubernetes.io/change-cause: "nieuwe ondertitel (sha-4000a15)"
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: snip-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: snip-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/bernardus/snip-api:sha-4000a15
+          ports:
+            - containerPort: 3000

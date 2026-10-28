@@ -1,0 +1,15 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: snip-api
+spec:
+  parentRefs:
+    - name: snip          # aan welke voordeur
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api      # welk verkeer: alles
+      backendRefs:
+        - name: snip-api  # naar welke Service
+          port: 80

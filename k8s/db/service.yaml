@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: snip-db
+spec:
+  clusterIP: None               # "headless": de naam wijst rechtstreeks naar de pod
+  selector:
+    app: snip-db
+  ports:
+    - port: 5432

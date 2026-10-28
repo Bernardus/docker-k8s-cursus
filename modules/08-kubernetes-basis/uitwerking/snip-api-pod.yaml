@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: snip-api
+  labels:
+    app: snip-api
+spec:
+  containers:
+    - name: api
+      image: ghcr.io/bernardus/snip-api:latest
+      ports:
+        - containerPort: 3000

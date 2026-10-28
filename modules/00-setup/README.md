@@ -247,8 +247,8 @@ we pas in module 04 in.
 | `git`, `gh` | versiebeheer, GitHub (CI/CD, GHCR) | module 05 |
 | `kubectl` | praten met Kubernetes | module 08 |
 
-Ze staan al op je Mac. Een tool voor een lokaal Kubernetes-cluster (kind of minikube, allebei
-werken met Podman) kiezen we in module 08.
+Ze staan al op je Mac. Voor een lokaal Kubernetes-cluster installeer je in module 08 **kind**, dat
+met Podman werkt. (minikube staat ook op je Mac, maar dat gebruiken we niet.)
 
 > **Tip:** veel mensen zetten `alias docker=podman` in hun shell, zodat tutorials 1-op-1
 > werken. Voor deze cursus raad ik aan om `podman` te typen. Dan weet je altijd wat je

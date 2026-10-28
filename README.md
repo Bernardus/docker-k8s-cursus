@@ -39,12 +39,12 @@ secrets, caching, healthchecks en schalen.
 | | 05 | [Productierijp image + eerste CI](modules/05-productierijp-en-ci/): GitHub Actions bouwt, scant en pusht naar GHCR | ✅ klaar |
 | | 06 | [Je eigen server](modules/06-eigen-server/): droplet bij DigitalOcean, SSH, firewall, Docker, snip online met Compose | ✅ klaar |
 | | 07 | [Automatisch deployen](modules/07-automatisch-deployen/): GitHub Actions → server via SSH, HTTPS met Caddy en sslip.io | ✅ klaar |
-| **2 · Kubernetes** (lokaal, op Podman) | 08 | Waarom Kubernetes + architectuur; van Podman-pod naar lokaal cluster `CKAD` | 🔜 |
-| | 09 | Pods, Deployments, rolling updates, rollback `CKAD` | 🔜 |
-| | 10 | Services, Ingress & Gateway API `CKAD` | 🔜 |
-| | 11 | ConfigMaps & Secrets `CKAD` | 🔜 |
-| | 12 | Storage: PVC, StatefulSet (Postgres) `CKAD` | 🔜 |
-| | 13 | Probes, requests/limits, autoscaling `CKAD` | 🔜 |
+| **2 · Kubernetes** (lokaal, op Podman) | 08 | [Waarom Kubernetes, en je eerste cluster](modules/08-kubernetes-basis/): architectuur, Podman-pods, kind, kubectl `CKAD` | ✅ klaar |
+| | 09 | [Deployments](modules/09-deployments/): kopieën die zichzelf herstellen, rolling updates, rollback `CKAD` | ✅ klaar |
+| | 10 | [Services en de Gateway](modules/10-services-en-gateway/): vaste adressen, load balancing, Envoy Gateway, Ingress `CKAD` | ✅ klaar |
+| | 11 | [ConfigMaps en Secrets](modules/11-configmaps-en-secrets/): de website erbij, wachtwoord in een Secret `CKAD` | ✅ klaar |
+| | 12 | [Opslag](modules/12-opslag/): de database in het cluster, met een PVC en een StatefulSet `CKAD` | ✅ klaar |
+| | 13 | [Probes, resources en autoscaling](modules/13-probes-en-schalen/): gezond of niet, grenzen aan CPU en geheugen, en meeschalen bij drukte `CKAD` | ✅ klaar |
 | | 14 | Helm (en Kustomize) `CKAD` | 🔜 |
 | | 15 | Namespaces, RBAC, quota, NetworkPolicies: meerdere teams in één cluster `CKAD` | 🔜 |
 | | 16 | Debuggen als een pro: events, logs, k9s, klassieke fouten `CKAD` | 🔜 |
@@ -67,6 +67,11 @@ secrets, caching, healthchecks en schalen.
   platformteam als het app-team. Daarna weet je op je werk wat er achter die centrale workflows en
   het cluster zit, en welk deel van jou is.
 - 4a en 4b staan los van elkaar. Doe er één of allebei. In module 25 komen ze samen.
+
+**Achtergrond:** [An Introduction to Kubernetes](docs/kubernetes-introduction.md) (Engels): het hele
+plaatje van Kubernetes op één plek, als naslag bij deel 2 en verder.
+[Kubernetes in plaatjes](docs/kubernetes-spiekbrief.md): spiekbrief met diagrammen (cluster, nodes,
+namespaces, Deployments, Services, Gateway) om de begrippen te onthouden.
 
 Modules met `CKAD` dekken stof van het CKAD-examen (zie [Certificaat](#certificaat-nodig)).
 

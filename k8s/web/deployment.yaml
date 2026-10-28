@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snip-web
+  labels:
+    app: snip-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: snip-web
+  template:
+    metadata:
+      labels:
+        app: snip-web
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.29-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: site                       # de webpagina...
+              mountPath: /usr/share/nginx/html #   ...komt hier te staan
+            - name: nginx-config               # de nginx-instellingen...
+              mountPath: /etc/nginx/conf.d     #   ...komen hier te staan
+      volumes:
+        - name: site
+          configMap:
+            name: snip-web-site                # uit deze ConfigMap
+        - name: nginx-config
+          configMap:
+            name: snip-web-nginx               # uit deze ConfigMap

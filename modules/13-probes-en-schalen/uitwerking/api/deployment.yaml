@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snip-api
+  labels:
+    app: snip-api
+  annotations:
+    kubernetes.io/change-cause: "overleeft een database-herstart (sha-xxxxxxx)"
+spec:
+  # geen replicas: meer, dat bepaalt de HorizontalPodAutoscaler nu
+  selector:
+    matchLabels:
+      app: snip-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: snip-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/bernardus/snip-api:sha-xxxxxxx   # ← jouw nieuwe tag uit stap 1
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: snip-db
+                  key: password
+            - name: DATABASE_URL
+              value: postgres://postgres:$(DB_PASSWORD)@snip-db:5432/snip
+          readinessProbe:              # klaar voor verkeer? (kan hij bij de database?)
+            httpGet:
+              path: /health/db
+              port: 3000
+            periodSeconds: 5
+          livenessProbe:               # leeft het proces nog? (anders: herstarten)
+            httpGet:
+              path: /health
+              port: 3000
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:                  # dit reserveert het cluster voor de pod
+              cpu: 50m
+              memory: 64Mi
+            limits:                    # hier gaat hij nooit overheen
+              cpu: 500m
+              memory: 128Mi

@@ -1,0 +1,38 @@
+# Instellingen voor Envoy: maak een gewone interne Service (ClusterIP).
+# In de cloud zou je hier een LoadBalancer krijgen; in kind bestaat die niet.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: kind
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: ClusterIP
+---
+# Welke software de voordeur is: Envoy Gateway, met de instellingen hierboven.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: envoy
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: kind
+    namespace: envoy-gateway-system
+---
+# De voordeur zelf: luistert op poort 80 (http).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: snip
+spec:
+  gatewayClassName: envoy
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
