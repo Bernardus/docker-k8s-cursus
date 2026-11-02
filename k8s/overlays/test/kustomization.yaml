@@ -25,4 +25,4 @@ patches:                         # schrijf alleen op wat anders is
       metadata:
         name: snip-web
       spec:
-        replicas: 1
+        replicas: 2
