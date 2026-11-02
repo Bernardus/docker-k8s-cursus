@@ -9,4 +9,4 @@ labels:
       env: prod
 images:
   - name: ghcr.io/bernardus/snip-api
-    newTag: sha-9743b8d          # prod draait een vaste, geteste versie, nooit latest
+    newTag: sha-4000a15          # prod draait een vaste, geteste versie, nooit latest
