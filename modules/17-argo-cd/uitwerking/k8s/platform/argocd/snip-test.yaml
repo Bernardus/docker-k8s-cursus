@@ -1,0 +1,19 @@
+# Omgeving test: Argo CD houdt snip-test gelijk aan k8s/overlays/test in Git.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: snip-test
+  namespace: argocd                # Applications staan altijd bij Argo CD zelf
+spec:
+  project: default
+  source:                          # wat: deze map, in deze repo, op deze branch
+    repoURL: https://github.com/Bernardus/docker-k8s-cursus.git
+    targetRevision: main
+    path: k8s/overlays/test
+  destination:                     # waar: dit cluster, deze namespace
+    server: https://kubernetes.default.svc
+    namespace: snip-test
+  syncPolicy:
+    automated:                     # zelf uitrollen als Git verandert
+      prune: true                  #   weg uit Git = weg uit het cluster
+      selfHeal: true               #   met de hand aangepast = terugzetten

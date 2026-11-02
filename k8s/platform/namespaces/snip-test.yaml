@@ -1,0 +1,86 @@
+# De namespace snip-test, zoals het platformteam hem uitdeelt: met grenzen en rechten.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: snip-test
+  labels:
+    env: test
+---
+# Het team snip-devs mag in test alles met de app doen (de ingebouwde rol edit)...
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: snip-devs
+  namespace: snip-test
+subjects:
+  - kind: Group                    # een groep, zoals op je werk een Entra ID-groep
+    name: snip-devs
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole                # een kant-en-klare rol...
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
+---
+# De pipeline: een eigen account, dat alleen Deployments mag bijwerken.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deployer
+  namespace: snip-test
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployer
+  namespace: snip-test
+rules:
+  - apiGroups: ["apps"]            # Deployments horen bij de groep apps (apiVersion: apps/v1)
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: [""]                # "" = de kern (apiVersion: v1): pods, services, secrets
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deployer
+  namespace: snip-test
+subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: snip-test
+roleRef:
+  kind: Role
+  name: deployer
+  apiGroup: rbac.authorization.k8s.io
+---
+# Hoeveel mag de hele namespace samen gebruiken?
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: snip-test
+  namespace: snip-test
+spec:
+  hard:
+    requests.cpu: "1"              # samen max. 1 processorkern gereserveerd
+    requests.memory: 1Gi
+    limits.cpu: "4"
+    limits.memory: 2Gi
+    pods: "10"
+---
+# Standaardwaarden voor containers die zelf niets opgeven.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: snip-test
+  namespace: snip-test
+spec:
+  limits:
+    - type: Container
+      defaultRequest:              # geen requests? dan deze
+        cpu: 50m
+        memory: 64Mi
+      default:                     # geen limits? dan deze
+        cpu: 500m
+        memory: 256Mi

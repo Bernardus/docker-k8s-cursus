@@ -19,6 +19,19 @@ spec:
           image: nginx:1.29-alpine
           ports:
             - containerPort: 80
+          readinessProbe:              # geeft nginx de pagina?
+            httpGet:
+              path: /
+              port: 80
+          livenessProbe:               # luistert nginx nog?
+            tcpSocket:
+              port: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
           volumeMounts:
             - name: site                       # de webpagina...
               mountPath: /usr/share/nginx/html #   ...komt hier te staan

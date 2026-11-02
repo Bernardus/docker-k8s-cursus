@@ -5,9 +5,8 @@ metadata:
   labels:
     app: snip-api
   annotations:
-    kubernetes.io/change-cause: "nieuwe ondertitel (sha-4000a15)"
+    kubernetes.io/change-cause: "nieuwe ondertitel (sha-9743b8d)"
 spec:
-  replicas: 3                     # zoveel kopieën
   selector:
     matchLabels:
       app: snip-api               # deze pods zijn van mij...
@@ -23,7 +22,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/bernardus/snip-api:sha-4000a15
+          image: ghcr.io/bernardus/snip-api:sha-9743b8d
           ports:
             - containerPort: 3000
           env:
@@ -34,4 +33,23 @@ spec:
                   key: password
             - name: DATABASE_URL               # ...en hier ingevuld met $(DB_PASSWORD)
               value: postgres://postgres:$(DB_PASSWORD)@snip-db:5432/snip
+          readinessProbe:              # klaar voor verkeer? (kan hij bij de database?)
+            httpGet:
+              path: /health/db
+              port: 3000
+            periodSeconds: 5
+          livenessProbe:               # leeft het proces nog? (anders: herstarten)
+            httpGet:
+              path: /health
+              port: 3000
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:                  # dit reserveert het cluster voor de pod
+              cpu: 50m
+              memory: 64Mi
+            limits:                    # hier gaat hij nooit overheen
+              cpu: 500m
+              memory: 128Mi
+
 

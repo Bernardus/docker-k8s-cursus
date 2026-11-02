@@ -1,0 +1,13 @@
+# De app levert zijn eigen instellingen: van deze bestanden maakt Kustomize ConfigMaps.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+configMapGenerator:
+  - name: snip-web-site
+    files:
+      - web/site/index.html
+  - name: snip-web-nginx
+    files:
+      - default.conf=web/nginx-k8s.conf   # sleutel default.conf, inhoud uit nginx-k8s.conf
+  - name: snip-db-init
+    files:
+      - db/links.sql

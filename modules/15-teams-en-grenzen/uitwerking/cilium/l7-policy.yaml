@@ -1,0 +1,20 @@
+# Cilium kijkt ook ín het verkeer: de website mag de API alleen iets vrágen (GET), niets toevoegen.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: snip-api-alleen-lezen
+spec:
+  endpointSelector:
+    matchLabels:
+      app: snip-api
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app: snip-web
+      toPorts:
+        - ports:
+            - port: "3000"
+              protocol: TCP
+          rules:
+            http:
+              - method: GET

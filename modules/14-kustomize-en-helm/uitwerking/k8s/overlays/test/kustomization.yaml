@@ -1,0 +1,28 @@
+# Omgeving test: de base, met alleen de verschillen hieronder.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: snip-test             # alles in een eigen namespace
+resources:
+  - ../../base
+labels:
+  - pairs:
+      env: test                  # een etiket op alles, handig om te zoeken
+images:
+  - name: ghcr.io/bernardus/snip-api
+    newTag: latest               # test draait altijd de nieuwste versie
+patches:                         # schrijf alleen op wat anders is
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: snip-api
+      spec:
+        minReplicas: 1
+        maxReplicas: 2
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: snip-web
+      spec:
+        replicas: 1

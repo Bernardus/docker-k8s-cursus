@@ -1,0 +1,15 @@
+# Prod draait (nog) in default. Die namespace bestaat al, dus hier alleen de rechten.
+# Het team snip-devs mag in prod alleen kijken (de ingebouwde rol view).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: snip-devs
+  namespace: default
+subjects:
+  - kind: Group
+    name: snip-devs
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole                # dezelfde kant-en-klare rollen als in snip-test...
+  name: view                       # ...maar hier alleen kijken
+  apiGroup: rbac.authorization.k8s.io

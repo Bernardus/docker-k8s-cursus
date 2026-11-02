@@ -1,0 +1,15 @@
+# De base: alles wat snip nodig heeft, in elke omgeving.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - gateway.yaml
+  - api/deployment.yaml
+  - api/service.yaml
+  - api/route.yaml
+  - api/hpa.yaml
+  - web/deployment.yaml
+  - web/service.yaml
+  - web/route.yaml
+  - db/statefulset.yaml
+  - db/service.yaml
+  - ../../app                # de ConfigMaps uit app/kustomization.yaml

@@ -1,0 +1,4 @@
+# Onze instellingen voor de Headlamp-chart. Alles wat hier niet staat, blijft de standaard.
+clusterRoleBinding:
+  clusterRoleName: view      # alleen kijken, niets veranderen
+replicaCount: 2

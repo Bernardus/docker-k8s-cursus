@@ -1,0 +1,16 @@
+# Omgeving prod: Argo CD ziet het verschil met Git, maar jij drukt op Sync.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: snip-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Bernardus/docker-k8s-cursus.git
+    targetRevision: main
+    path: k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  # geen syncPolicy: prod rolt alleen uit als iemand op Sync drukt

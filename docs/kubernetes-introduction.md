@@ -1,523 +1,243 @@
 # An Introduction to Kubernetes
 
-A companion to the course modules. Where the modules are hands-on and in Dutch, this document
-gives you the full picture in one place, in English: what Kubernetes is, why it exists, how it
-works inside, and what all those object types are for. Read it once now; come back to it
-whenever a module introduces something new.
-
----
+This is a companion to the course modules, written to be read aloud. The modules are hands-on and in Dutch. This document is in English and gives you the full picture in one go: what Kubernetes is, why it exists, how it works on the inside, and what all those object types are for. Listen to it once now, and come back to it whenever a module introduces something new.
 
 ## 1. What problem does Kubernetes solve?
 
-Containers solved *packaging*: an image contains your app, its runtime and its dependencies,
-and it runs the same everywhere. But containers alone don't answer the questions you face as
-soon as an app matters:
+Containers solved packaging. An image holds your app, its runtime and its dependencies, and it runs the same everywhere. But containers alone don't answer the questions you face as soon as an app starts to matter.
 
-- **Where** does each container run, when you have more than one server?
-- **What happens** when a container crashes at 3 a.m.? When a whole server dies?
-- **How do you update** to a new version without downtime, and roll back if it breaks?
-- **How do containers find each other** when they move around and change IP addresses?
-- **How do you scale** from 2 to 20 copies when traffic spikes, and back again?
-- **Where do configuration and secrets** come from, per environment?
+Where does each container run, when you have more than one server? What happens when a container crashes at three in the morning, or when a whole server dies? How do you update to a new version without downtime, and roll back if it breaks? How do containers find each other when they keep moving around and changing IP addresses? How do you go from two copies to twenty when traffic spikes, and back again? And where do configuration and secrets come from, for each environment?
 
-On a single machine, Compose answers some of these (you saw that in modules 04–07). Across
-many machines, with no human watching, you need an **orchestrator**. Kubernetes is the
-orchestrator that won.
+On a single machine, Compose answers some of these questions. You saw that in modules four to seven. But across many machines, with no human watching, you need an orchestrator. Kubernetes is the orchestrator that won.
 
 ### A very short history
 
-Google ran its own services on an internal cluster manager called **Borg** for over a decade.
-In 2014 it open-sourced a redesign of those ideas as **Kubernetes** (Greek for *helmsman*; the
-logo is a ship's wheel). In 2015 it was donated to the newly formed **Cloud Native Computing
-Foundation (CNCF)**, part of the Linux Foundation. Within a few years every major cloud offered
-managed Kubernetes, and competing orchestrators (Docker Swarm, Mesos) faded.
+For more than a decade, Google ran its own services on an internal cluster manager called Borg. In 2014 it open-sourced a redesign of those ideas and called it Kubernetes. That's Greek for helmsman, the person who steers a ship, which is why the logo is a ship's wheel. In 2015 Google donated it to the newly formed Cloud Native Computing Foundation, the CNCF, which is part of the Linux Foundation. Within a few years every major cloud offered managed Kubernetes, and competing orchestrators like Docker Swarm and Mesos faded away.
 
-The abbreviation **k8s** is a *numeronym*: k, then 8 letters, then s.
+You'll often see Kubernetes written as k8s. That's a numeronym: the letter k, then eight letters, then the letter s.
 
 ### What Kubernetes is not
 
-- **Not a container runtime.** It doesn't run containers itself; it tells a runtime
-  (containerd or CRI-O) on each node what to run.
-- **Not a build tool.** It runs images; something else (your CI pipeline) builds them.
-- **Not a PaaS.** It gives you building blocks, not a finished platform. Platform teams build
-  the platform *on top of* Kubernetes.
-- **Not always the right answer.** For one app on one server, Compose is simpler. Kubernetes
-  pays off when you have many apps, many machines, many teams, or strict uptime needs.
+Kubernetes is not a container runtime. It doesn't run containers itself. It tells a runtime on each machine, usually containerd, what to run.
 
----
+It is not a build tool either. It runs images, and something else, like your CI pipeline, builds them.
+
+It is not a finished platform. It gives you building blocks, and platform teams build the platform on top of it.
+
+And it is not always the right answer. For one app on one server, Compose is simpler. Kubernetes pays off when you have many apps, many machines, many teams, or strict uptime requirements.
 
 ## 2. The core idea: declarative desired state
 
 Everything in Kubernetes follows one idea. Once you understand it, the rest is details.
 
-**Imperative** (what you did with Podman): you issue commands.
+With Podman, you worked imperatively. You gave commands: start this, stop that.
 
-```
-podman run snip-api      # "start this"
-podman stop snip-api     # "stop that"
-```
+Kubernetes is declarative. Instead of giving commands, you describe the state you want, and the system makes it so. You write down, for example: there should always be three copies of the snip API. You hand that description to the cluster, and from then on, small programs inside the cluster called controllers keep comparing what you asked for with what actually exists. If they see a gap, they act to close it.
 
-**Declarative** (Kubernetes): you describe the state you want, and the system makes it so.
+Say one of the three copies crashes, or the machine it ran on dies. The controller notices that there are two instead of three, and starts a new one. Then it checks again, and again, forever. This is called the reconciliation loop, and it is why Kubernetes is called self-healing. Nobody has to notice the crash. The loop does.
 
-```yaml
-kind: Deployment
-spec:
-  replicas: 3          # "there should always be three of these"
-```
+You'll feel two consequences of this every day. First, applying the same description twice changes nothing the second time. You describe what you want, not what to do right now. Second, you rarely touch individual containers. You change the description, and the controllers change the containers. If you delete a pod that belongs to a Deployment, the Deployment simply creates a new one.
 
-You hand this description to the cluster with `kubectl apply`. From then on, **controllers**
-inside the cluster continuously compare the *desired state* with the *actual state*, and act
-to close any gap:
-
-```
-          ┌────────────────────────────┐
-          │ desired: 3 × snip-api      │ ◄── you write this (YAML in Git)
-          └─────────────┬──────────────┘
-                        │ observe
-                        ▼
-          ┌────────────────────────────┐
-          │ actual:  2 × snip-api      │ ◄── one crashed, or its node died
-          └─────────────┬──────────────┘
-                        │ diff → act: start 1
-                        ▼
-                   (repeat forever)
-```
-
-This is the **reconciliation loop**, and it is why Kubernetes is called *self-healing*.
-Nobody has to notice the crash; the loop does.
-
-Two consequences you'll feel every day:
-
-1. **`kubectl apply` is idempotent.** Applying the same file twice changes nothing the second
-   time (`unchanged`). You describe *what*, not *do this now*.
-2. **You rarely touch individual containers.** You change the description; the controllers
-   change the containers. Deleting a pod managed by a Deployment just makes the Deployment
-   create a new one.
-
-This is also why GitOps (Argo CD, part 3 of the course) fits Kubernetes so naturally: if the
-desired state is a set of files, you can keep those files in Git and let a tool keep the
-cluster in sync with them.
-
----
+This is also why GitOps fits Kubernetes so naturally. If the desired state is a set of files, you can keep those files in Git and let a tool, like Argo CD in part three of the course, keep the cluster in sync with them.
 
 ## 3. Architecture
 
-A Kubernetes **cluster** is a set of machines (**nodes**) plus a **control plane** that
-manages them.
+A Kubernetes cluster is a set of machines, called nodes, plus a control plane that manages them.
 
-```
-              kubectl / CI / Argo CD
-                        │  HTTPS (REST + watch)
-┌───────────────────────▼───────────────────── control plane ─────────────────┐
-│  kube-apiserver        the only entry point; validates and stores objects   │
-│  etcd                  consistent key-value store: the cluster's database   │
-│  kube-scheduler        picks a node for every new pod                       │
-│  kube-controller-manager  runs the built-in reconciliation loops            │
-│  cloud-controller-manager (managed clusters) talks to the cloud provider    │
-└───────────────┬─────────────────────────┬──────────────────────┬────────────┘
-                │ watch                   │                      │
-┌───────────────▼───────┐   ┌─────────────▼─────────┐   ┌────────▼──────────────┐
-│ node                  │   │ node                  │   │ node                  │
-│  kubelet              │   │  kubelet              │   │  kubelet              │
-│  container runtime    │   │  container runtime    │   │  container runtime    │
-│  kube-proxy           │   │  kube-proxy           │   │  kube-proxy           │
-│  pods…                │   │  pods…                │   │  pods…                │
-└───────────────────────┘   └───────────────────────┘   └───────────────────────┘
-```
+### The control plane
 
-### Control plane components
+The control plane is the brain of the cluster. It has a handful of parts.
 
-| Component | Role |
-|---|---|
-| **kube-apiserver** | The front door. Every client (kubectl, controllers, kubelets) talks *only* to the API server. It authenticates, authorizes, validates, and stores objects in etcd. Nothing talks to etcd directly. |
-| **etcd** | A distributed, strongly consistent key-value store. Holds every object: desired state and reported status. Back it up, and the cluster can be rebuilt. |
-| **kube-scheduler** | Watches for pods without a node, and assigns each to a node based on resource requests, constraints (affinity, taints/tolerations) and spread. It only *decides*; the kubelet *executes*. |
-| **kube-controller-manager** | A single binary running dozens of controllers: Deployment, ReplicaSet, Node, Job, EndpointSlice, ServiceAccount… each a reconciliation loop for one kind of object. |
-| **cloud-controller-manager** | On cloud clusters: creates load balancers for Services, attaches disks, manages node lifecycle with the cloud API. |
+The API server is the front door. Every client talks only to the API server: your kubectl, your CI pipeline, Argo CD, and even the other parts of Kubernetes itself. The API server checks who you are, checks what you're allowed to do, validates what you send, and stores it.
 
-### Node components
+It stores everything in etcd, a small, very reliable database. etcd holds every object in the cluster: both what you asked for and what the cluster reports back. Back up etcd, and you can rebuild the cluster.
 
-| Component | Role |
-|---|---|
-| **kubelet** | The agent on every node. Watches the API server for pods assigned to its node, tells the runtime to start their containers, runs health probes, and reports status back. |
-| **container runtime** | Actually runs containers, via the Container Runtime Interface (CRI). Usually **containerd** or **CRI-O**. (Docker Engine support was removed in 1.24; images built with Docker or Podman run fine, since they're all OCI images.) |
-| **kube-proxy** | Programs the node's networking (iptables, IPVS or nftables rules) so that traffic to a Service reaches one of its pods. Some network plugins replace it entirely. |
-| **CNI plugin** | Not a single component but a plugin (Calico, Cilium, Azure CNI, kindnet…) that gives each pod an IP address and connects pods across nodes. |
+The scheduler watches for new pods that don't have a machine yet, and picks a node for each one, based on how much CPU and memory the pod asks for and on any placement rules. The scheduler only decides. It doesn't start anything.
+
+The controller manager runs dozens of those reconciliation loops: one for Deployments, one for ReplicaSets, one for Jobs, one for nodes, and so on. Each loop looks after one kind of object.
+
+On cloud clusters there's also a cloud controller manager, which talks to the cloud provider to create load balancers, attach disks, and manage machines.
+
+### The nodes
+
+Every node runs an agent called the kubelet. The kubelet watches the API server for pods assigned to its node, tells the container runtime to start their containers, runs their health checks, and reports their status back.
+
+The container runtime does the actual work of running containers. Usually that's containerd. Images you built with Docker or Podman run fine, because they all follow the same open image standard.
+
+Then there's networking. A network plugin gives every pod its own IP address and connects pods across nodes. Cilium and Calico are well-known examples. And kube-proxy, or a network plugin that replaces it, makes sure that traffic sent to a Service ends up at one of its pods.
 
 ### What happens when you apply a Deployment
 
-A concrete walk-through ties the pieces together:
+Let's walk through it, because it ties all the pieces together.
 
-1. You run `kubectl apply -f deployment.yaml`. kubectl sends the object to the **API server**.
-2. The API server authenticates you, checks your permissions (RBAC), runs **admission
-   controllers** (policies that can reject or modify the object), and stores it in **etcd**.
-3. The **Deployment controller** (in the controller manager) sees a new Deployment and creates a
-   **ReplicaSet** for it.
-4. The **ReplicaSet controller** sees it needs 3 pods and has 0, so it creates 3 **Pod** objects.
-   They have no node yet.
-5. The **scheduler** sees 3 unscheduled pods and assigns each to a node.
-6. The **kubelet** on each chosen node sees a pod assigned to it, asks the **container runtime** to
-   pull the image and start the containers, and the **CNI plugin** gives the pod an IP.
-7. The kubelet runs the **readiness probe**. When it passes, the pod is marked *Ready*.
-8. The **EndpointSlice controller** adds the ready pod's IP to the Service, and **kube-proxy** on
-   every node updates its rules. Traffic now flows to the new pod.
+You apply a Deployment, and kubectl sends it to the API server. The API server checks who you are and whether you're allowed to do this, runs any policies that might reject or adjust it, and stores it in etcd.
 
-Notice that no component tells another what to do directly. Each one **watches** the API server
-for objects it cares about and reacts. That loose coupling is why Kubernetes is so extensible.
+The Deployment controller notices the new Deployment and creates a ReplicaSet for it. The ReplicaSet controller notices it needs three pods and has none, so it creates three pod objects. At this point they don't have a node yet.
 
-`kubectl describe pod` shows this journey in its **Events**: `Scheduled`, `Pulling`, `Pulled`,
-`Created`, `Started`.
+The scheduler notices three pods without a node and assigns each to one. The kubelet on each chosen node notices a pod assigned to it, asks the runtime to pull the image and start the container, and the network plugin gives the pod an IP address.
 
----
+The kubelet then runs the readiness check. When it passes, the pod is marked ready, it gets added behind its Service, and traffic starts to flow to it.
+
+Notice that no part tells another part what to do. Each one watches the API server for the objects it cares about, and reacts. That loose coupling is what makes Kubernetes so easy to extend. When you describe a pod with kubectl, you can see this whole journey in its events: scheduled, pulling, pulled, created, started.
 
 ## 4. Objects: the vocabulary
 
-Everything in Kubernetes is an **object** (also called a *resource*) stored in the API: a pod,
-a service, a secret. Each object has the same shape:
+Everything in Kubernetes is an object stored in the API: a pod, a service, a secret. You describe objects in files called manifests. The word comes from a ship's manifest, the list of everything that's supposed to be on board.
 
-```yaml
-apiVersion: apps/v1          # which API group and version defines this kind
-kind: Deployment             # what type of object
-metadata:
-  name: snip-api             # unique within its namespace and kind
-  namespace: snip            # which namespace (default: "default")
-  labels:                    # key-value tags used for selection
-    app: snip-api
-spec:                        # desired state: what YOU want
-  ...
-status:                      # actual state: what the CLUSTER reports (read-only)
-  ...
-```
+Every object has the same shape. It says which API version and which kind it is, it has metadata like a name, a namespace and labels, and then it has two important parts: spec and status. The spec is what you want. The status is what the cluster reports. That pair, spec versus status, is the whole declarative model in miniature.
 
-`spec` versus `status` is the declarative model in miniature.
+Manifests are usually written in YAML, although the API itself speaks JSON. YAML is just friendlier for humans: you can write comments, and you don't need all the braces and quotes. A single YAML file can hold several objects, separated by a line of three dashes.
 
 ### Labels and selectors
 
-**Labels** are arbitrary key-value pairs on objects. **Selectors** are queries over labels.
-Most relationships in Kubernetes are not hard references but label selectors:
+Labels are simple key-value tags you put on objects, like app equals snip-api. Selectors are queries over those labels.
 
-- a Deployment manages the pods whose labels match its selector;
-- a Service sends traffic to the pods whose labels match its selector;
-- a NetworkPolicy applies to the pods whose labels match its selector.
+Most relationships in Kubernetes aren't hard links, they're selectors. A Deployment manages the pods whose labels match its selector. A Service sends traffic to the pods whose labels match its selector. A network policy applies to the pods whose labels match its selector.
 
-```yaml
-# Service: "send traffic to any pod labelled app=snip-api"
-spec:
-  selector:
-    app: snip-api
-```
-
-This is powerful and also a classic source of bugs: a typo in a label means a Service silently
-selects zero pods.
+That's powerful, and it's also a classic source of bugs. A typo in a label, and a Service silently selects zero pods.
 
 ### Namespaces
 
-A **namespace** is a scope for names, permissions and quotas inside one cluster. Two teams can
-each have a Service called `api` in their own namespace. Platform teams typically give each
-team (or each team-environment pair) its own namespaces. Some objects, like Nodes and
-PersistentVolumes, are cluster-wide and have no namespace.
+A namespace is a scope inside a cluster for names, permissions and budgets. Two teams can each have a Service called api, each in their own namespace. Platform teams usually give each team, or each combination of team and environment, its own namespaces, like snip-test and snip-prod. A few objects, like nodes, belong to the whole cluster and have no namespace.
 
 ### Workloads: what runs
 
-| Object | Use it for | Notes |
-|---|---|---|
-| **Pod** | The smallest unit: one or more containers sharing network (`localhost`, one IP) and optionally volumes, always on the same node. | You almost never create pods directly; controllers do. Pods are disposable and get new IPs when replaced. |
-| **ReplicaSet** | Keeps N identical pods running. | Managed by Deployments; you rarely touch it. |
-| **Deployment** | Stateless apps (APIs, web frontends). Manages ReplicaSets to provide **rolling updates** and **rollbacks**. | The workhorse. `snip-api` and `snip-web` will be Deployments. |
-| **StatefulSet** | Stateful apps (databases, queues) that need stable names (`db-0`, `db-1`), stable storage per replica, and ordered startup. | `snip-db` will be a StatefulSet. In enterprises, databases are often managed services instead. |
-| **DaemonSet** | One pod on every node (or every matching node). | Log collectors, monitoring agents, network plugins. |
-| **Job** | Run something to completion, with retries. | Database migrations, one-off tasks. |
-| **CronJob** | Run a Job on a schedule. | Nightly backups, cleanups. |
+The smallest unit is the pod: one or more containers that share a network and always run together on the same machine. You almost never create pods yourself. Controllers do that for you. Pods are disposable, and they get a new IP address every time they're replaced.
 
-A pod can also have **init containers** (run to completion before the app starts, e.g. wait for
-a database) and **sidecar containers** (run alongside the app for its whole lifetime, e.g. a
-log shipper or proxy).
+A ReplicaSet keeps a fixed number of identical pods running. You rarely touch one directly, because Deployments manage them for you.
+
+A Deployment is the workhorse, for stateless apps like APIs and web frontends. It manages ReplicaSets to give you rolling updates and rollbacks. The snip API and the snip web frontend are Deployments.
+
+A StatefulSet is for stateful apps like databases. It gives each copy a stable name, like db zero and db one, its own storage, and a fixed start-up order. The snip database is a StatefulSet. In larger companies, databases are often a managed cloud service instead.
+
+A DaemonSet runs one pod on every node, which is handy for log collectors and monitoring agents.
+
+A Job runs something until it's finished, with retries, like a database migration. And a CronJob runs a Job on a schedule, like a nightly backup.
+
+A pod can also have init containers, which run to completion before the app starts, for instance to wait for a database. And it can have sidecar containers, which run next to the app for its whole life, like a log shipper or a proxy.
 
 ### Networking: how traffic finds pods
 
-Kubernetes has a simple, strict **network model**:
+Kubernetes has a simple network model. Every pod gets its own IP address, and every pod can reach every other pod directly, across nodes. Network policies can then restrict that.
 
-- every pod gets its own IP address;
-- every pod can reach every other pod directly, without NAT, across nodes;
-- (and then NetworkPolicies can restrict that).
+Because pod addresses keep changing, you never use them directly. Instead you put a Service in front. A Service is like a customer service phone number: the number stays the same, but who picks up changes. It gives a stable name and address to a changing group of pods, and spreads traffic between them.
 
-Pod IPs change whenever pods are replaced, so you never use them directly. Instead:
+By default a Service is only reachable inside the cluster. That's how the API reaches the database, simply by the name snip-db. There are also Services that open a port on every node, mostly for testing, and Services that ask the cloud for a real external load balancer. A headless Service has no shared address at all, and hands out the pod addresses directly. That's used with StatefulSets.
 
-| Object | What it gives you |
-|---|---|
-| **Service** | A stable virtual IP and **DNS name** in front of a changing set of pods (selected by labels), with load balancing between them. |
-| ↳ `ClusterIP` (default) | Reachable only inside the cluster. `snip-db` will be one: `postgres://…@snip-db:5432`. |
-| ↳ `NodePort` | Opens the same port on every node. Mostly for testing. |
-| ↳ `LoadBalancer` | Asks the cloud for an external load balancer with a public IP. |
-| ↳ headless (`clusterIP: None`) | No virtual IP; DNS returns pod IPs directly. Used with StatefulSets. |
-| **Ingress** | HTTP(S) routing from outside: host names and paths to Services, with TLS. Needs an *ingress controller* to do the actual work. |
-| **Gateway API** | The successor to Ingress: more expressive (traffic splitting, header matching, TCP/gRPC), with a clear split between platform-owned **Gateways** and app-owned **HTTPRoutes**. |
-| **NetworkPolicy** | Firewall rules between pods: "only `snip-api` may talk to `snip-db` on 5432". Enforced by the CNI plugin. |
+To bring web traffic in from outside, there used to be Ingress. Its successor is the Gateway API, which is more expressive and splits the work cleanly: the platform team owns the Gateway, the front door itself, and app teams own the routes that send traffic to their Services. The most widely used Ingress controller, ingress-nginx, was retired in March 2026, so new setups use Gateway implementations like Envoy Gateway, which is what this course uses.
 
-**DNS**: CoreDNS gives every Service a name. Inside the same namespace you can use the short
-name (`snip-db`); from elsewhere the full form is `snip-db.<namespace>.svc.cluster.local`. This is
-the cluster-wide version of the Compose/Podman network DNS you used in modules 02 and 04.
+Network policies are firewall rules between pods, like: only the snip API may talk to the snip database, on the Postgres port. The network plugin enforces them.
 
-> **Note (2026):** the most widely used ingress controller, *ingress-nginx*, was retired by the
-> Kubernetes project in March 2026. New setups use Gateway API implementations (Envoy-based
-> gateways, Traefik, Istio, or cloud offerings like the AKS application routing gateway). The
-> Ingress API itself still exists and is still on the CKAD exam.
+Every Service also gets a DNS name. Inside the same namespace, the short name is enough. From another namespace, you add the namespace name. It's the cluster-wide version of the network names you used with Compose.
 
 ### Configuration
 
-| Object | For |
-|---|---|
-| **ConfigMap** | Non-secret configuration: key-value pairs or whole files. Injected as environment variables or mounted as files. |
-| **Secret** | Sensitive values: passwords, tokens, certificates. Same mechanics as ConfigMaps. **Base64-encoded, not encrypted** by default; anyone who can read Secrets in the namespace can read them. Clusters can enable encryption at rest, and enterprises usually source secrets from a vault (Azure Key Vault via the External Secrets Operator or the Secrets Store CSI driver). |
+A ConfigMap holds configuration that isn't secret: settings, or whole files like an nginx configuration. A Secret holds sensitive values like passwords and tokens. Both can be handed to a container as environment variables or as files.
 
-The rule from module 03 still applies: **one image, configured per environment**. The image is
-identical in dev and prod; ConfigMaps and Secrets differ.
+One warning about Secrets: by default they're only encoded, not encrypted. Anyone who's allowed to read Secrets in a namespace can read the passwords. That's why companies usually keep the real secrets in a vault, like Azure Key Vault, and sync them in with a tool like External Secrets.
+
+The rule from module three still applies: one image, configured per environment. The image is identical in test and production. Only the ConfigMaps and Secrets differ.
 
 ### Storage
 
-Containers are disposable, so their filesystems are too. For data that must survive:
+Containers are disposable, and so are their file systems. For data that has to survive, there are three pieces.
 
-| Object | Role |
-|---|---|
-| **PersistentVolume (PV)** | A piece of real storage (an Azure Disk, an NFS share, a local directory). Cluster-wide. |
-| **PersistentVolumeClaim (PVC)** | A request for storage by an app: "I need 10 GiB, read-write by one node". Namespaced. |
-| **StorageClass** | A recipe for creating PVs on demand (*dynamic provisioning*): "managed-csi = Azure Premium SSD". |
+A persistent volume claim is the app's request for storage, like: I need ten gigabytes that one node can write to. A storage class is a recipe that creates the actual storage on demand, like an Azure SSD. And the persistent volume is the actual piece of storage that comes out of it.
 
-The app asks (PVC), the StorageClass provisions (PV), and the pod mounts the claim. You never
-need to know which disk you got. This is the cluster version of the named volume `snip-data`
-from module 02. Also the same caveat: deleting the claim can delete the data, depending on
-the reclaim policy.
+The app asks, the storage class provides, and the pod mounts the claim. You never need to know which disk you got. It's the cluster version of the named volume from module two, with the same warning: deleting the claim can delete the data.
 
-### Health and resources
+### Health
 
-| Field | Purpose |
-|---|---|
-| **livenessProbe** | "Is this container alive?" If it fails repeatedly, the kubelet **restarts** the container. snip uses `/health`. |
-| **readinessProbe** | "Can it take traffic right now?" If it fails, the pod is **removed from Service endpoints** (not restarted). snip uses `/health/db`. |
-| **startupProbe** | Gives slow-starting apps time before liveness checks begin. |
-| **resources.requests** | What the container is guaranteed; the scheduler uses this to place pods. |
-| **resources.limits** | The maximum. Exceeding the memory limit gets the container killed (`OOMKilled`); CPU is throttled. |
+The kubelet runs health checks called probes. The liveness probe asks: is this container still alive? If it keeps failing, the container is restarted. The readiness probe asks: can this pod take traffic right now? If it fails, the pod is taken out from behind its Service, but not restarted. Snip uses the health endpoint for liveness, and the database health endpoint for readiness. There's also a startup probe, which gives slow apps some time before the liveness checks begin.
 
-And for scaling:
+### Resources and budgets
 
-| Object | Role |
-|---|---|
-| **HorizontalPodAutoscaler (HPA)** | Changes a Deployment's replica count based on CPU, memory, or custom metrics. |
-| **Cluster autoscaler / node autoprovisioning** | Adds or removes *nodes* when pods can't be scheduled or nodes sit idle (cloud clusters). |
-| **PodDisruptionBudget (PDB)** | "Never take down more than one `snip-api` pod at a time during maintenance." |
+Each container can state requests and limits for CPU and memory. The request is what the container is guaranteed, and the scheduler uses it to decide where the pod fits. The limit is the maximum. A container that goes over its memory limit gets killed, and one that wants more CPU than its limit just gets slowed down.
+
+On the namespace level there are two more objects. A ResourceQuota is the budget for the whole namespace, all pods together. A LimitRange fills in default requests and limits for containers that don't set their own. Think of it like this: the container's resources are what one person spends, the quota is the team budget, and the limit range is the default allowance for anyone who forgot to say.
+
+If a new pod would push the namespace over its quota, it's refused. Not queued, refused.
+
+### Scaling
+
+A HorizontalPodAutoscaler changes a Deployment's number of copies based on how busy the pods are. You don't hard-code the number anymore. You give it a minimum, a maximum and a target, for example: keep the average CPU usage around seventy percent of what the pods requested. If the pods get busier, it adds copies. If they're quiet for a while, it removes some, slowly on purpose, so it doesn't flap up and down. It needs the metrics server to see how busy the pods are, and it needs the pods to have CPU requests, because the percentage is calculated from those.
+
+On cloud clusters, a cluster autoscaler can also add or remove whole machines. And a pod disruption budget makes sure maintenance never takes down too many copies of an app at the same time.
 
 ### Identity and access
 
-| Object | Role |
-|---|---|
-| **ServiceAccount** | An identity for pods, so apps can talk to the API server, or (with workload identity) to Azure. |
-| **Role / ClusterRole** | A set of permissions: verbs (`get`, `list`, `create`…) on resources. |
-| **RoleBinding / ClusterRoleBinding** | Grants a role to a user, group, or ServiceAccount. |
+Kubernetes has two kinds of identities. People, who on Azure log in with Microsoft Entra ID, and machines, which use a ServiceAccount. A pipeline that deploys, or an app that talks to the API, gets its own ServiceAccount. Clouds have the same idea under different names, like a managed identity on Azure, and they can be linked together so no passwords need to be stored at all.
 
-On AKS, human users authenticate with Microsoft Entra ID, and their group memberships map to
-RBAC roles. That's why at work you might be able to `get pods` in your namespace but not
-`delete` them, or not see other teams' namespaces at all.
+Permissions work through roles. A role is a list of what's allowed: which actions, on which kinds of objects. A role binding gives that role to a person, a group or a ServiceAccount. There are ready-made roles in every cluster, like view, which can only look and can't read Secrets, edit, which can change almost everything in a namespace, and admin. For machines you usually write your own small role, with only what's needed. A deployer, for example, only needs to read and patch Deployments, and look at pods.
 
-Two more objects round out multi-tenancy: **ResourceQuota** (caps total CPU/memory/objects per
-namespace) and **LimitRange** (default requests/limits for pods that don't set them).
+One thing that surprises people: the actions in a role aren't kubectl commands. They're the actions of the API, which follow the web's HTTP methods: get, list, watch, create, update, patch and delete. Apply doesn't exist as an action. Applying an existing object is really a get followed by a patch, and applying a new one is a get followed by a create. Roles protect the API, not one particular tool, so that Helm, Argo CD and your own code all play by the same rules.
 
----
+And if nothing grants you a permission, you don't have it. Without a role binding, a team can't even look inside a namespace.
 
 ## 5. Rolling updates and rollbacks
 
-When you change a Deployment's pod template (say, a new image tag), the Deployment creates a
-**new ReplicaSet** and gradually shifts pods to it:
+When you change the pod template of a Deployment, for example by giving it a new image tag, the Deployment creates a new ReplicaSet and moves pods over to it step by step. A new pod starts. Once it's ready, an old one is removed. And so on, until all pods run the new version.
 
-```
- v1 ReplicaSet: ●●●            v2 ReplicaSet:
- v1 ReplicaSet: ●●●            v2 ReplicaSet: ○          (new pod starting)
- v1 ReplicaSet: ●●             v2 ReplicaSet: ●          (new pod ready → old one removed)
- v1 ReplicaSet: ●              v2 ReplicaSet: ●●
- v1 ReplicaSet:                v2 ReplicaSet: ●●●        done
-```
+Two settings control the pace. Max surge says how many pods may be added on top of the desired number during an update. Max unavailable says how many may be missing. With a surge of one and zero unavailable, Kubernetes always starts one new pod first, and only removes an old one when the new one is ready. That gives you updates without downtime.
 
-`maxSurge` and `maxUnavailable` control the pace. **Readiness probes** are what make this safe:
-an old pod is only removed when a new one is ready. If the new version never becomes ready, the
-rollout stalls and the old pods keep serving traffic.
+These settings are relative to the number of copies at that moment, also when the autoscaler decides that number. So if the autoscaler has scaled to its maximum of six, and you roll out an update with a surge of one, you'll briefly have seven pods. Make sure your cluster and your namespace quota have room for that. If the quota is full, the extra pod is refused, and because no old pod may leave first, the rollout gets stuck.
 
-The old ReplicaSet is kept (scaled to zero), so `kubectl rollout undo` can switch back
-instantly. In a GitOps setup you'd instead revert the commit, and Argo CD rolls back.
+Readiness probes are what make all this safe. If the new version never becomes ready, the rollout stalls, and the old pods keep serving traffic.
 
-During shutdown, each old pod receives **SIGTERM**, has a grace period (30 s by default) to
-finish in-flight requests, and then gets SIGKILL. This is why the graceful-shutdown handler
-from module 05 matters.
+A rollout only happens when the pod template changes. If you apply the same image tag again, like latest, nothing changes in the description, so nothing happens. Kubernetes doesn't go and check whether there's a newer image behind that tag. That's why you use a unique tag per version, like the Git commit.
 
----
+The old ReplicaSet is kept around with zero pods, so you can roll back instantly. You can add a change-cause note to a Deployment, so the rollout history tells you what each version was. In a GitOps setup you'd simply revert the commit, and Argo CD rolls back.
 
-## 6. Talking to the cluster: kubectl
+When an old pod is stopped, it first gets a polite signal to shut down, and thirty seconds by default to finish what it's doing, before it's killed. That's why the graceful shutdown handling from module five matters.
 
-`kubectl` is a client for the API server. Which cluster it talks to is determined by the current
-**context** in `~/.kube/config` (cluster address + credentials + default namespace).
+## 6. Talking to the cluster
 
-```bash
-kubectl config get-contexts               # which clusters do I know? (* = current)
-kubectl config use-context kind-snip      # switch
+kubectl is a client for the API server. Which cluster it talks to depends on the current context in your kube config file: a combination of a cluster address, your credentials, and a default namespace.
 
-kubectl get pods                          # list (in the current namespace)
-kubectl get pods -A                       # all namespaces
-kubectl get deploy,svc,pods -n snip       # several kinds, in namespace "snip"
-kubectl describe pod <name>               # details + Events (start here when debugging)
-kubectl logs <pod> [-c container] [--previous] [-f]
-kubectl exec -it <pod> -- sh
-kubectl port-forward svc/snip-web 8080:80 # temporary tunnel from your machine
+The commands you'll use all the time are get, to list objects; describe, to see details and events; logs, to read what a container printed; exec, to open a shell inside a container; and apply, to send your manifests to the cluster. There's also diff, to see what apply would change, rollout status, to wait until an update is done, and rollout undo, to go back.
 
-kubectl apply -f k8s/                     # create/update everything in a folder
-kubectl delete -f k8s/
-kubectl diff -f k8s/                      # what would apply change?
+Because everything inside a local cluster is internal by default, you use port forward to open a temporary tunnel from your own machine to a Service. That tunnel only lives as long as the command runs. Close the terminal, and the tunnel is gone.
 
-kubectl rollout status deploy/snip-api
-kubectl rollout undo deploy/snip-api
+When something goes wrong, work from the outside in. First, get the pods and look at their status. Then describe the pod and read the events. Then read the logs, including those of the previous crashed run. And finally, check whether the Service actually selects any pods.
 
-kubectl explain deployment.spec.strategy  # built-in reference docs
-kubectl create deployment x --image=y --dry-run=client -o yaml   # generate YAML
-```
-
-A debugging habit worth building early, from the outside in:
-
-1. `kubectl get pods`: what's the status? (`Pending`, `ImagePullBackOff`, `CrashLoopBackOff`,
-   `Running` but not `Ready`?)
-2. `kubectl describe pod`: what do the **Events** say?
-3. `kubectl logs [--previous]`: what did the app say before it died?
-4. `kubectl get endpointslices` / `describe svc`: does the Service actually select any pods?
-
-| Status | Usually means |
-|---|---|
-| `Pending` | No node has room (requests too high), or a PVC can't be bound. |
-| `ImagePullBackOff` / `ErrImagePull` | Wrong image name/tag, private registry without credentials, or no image for the node's architecture. |
-| `CrashLoopBackOff` | The container starts and exits, over and over. Check `logs --previous`. |
-| `Running`, `0/1 Ready` | Readiness probe failing: the app is up but not ready (e.g. can't reach its database). |
-| `OOMKilled` | Exceeded its memory limit. |
-| `CreateContainerConfigError` | A referenced ConfigMap or Secret (or key) doesn't exist. |
-
----
+A few statuses you'll see a lot. Pending usually means no node has room, or the storage isn't ready. Image pull back-off means a wrong image name or tag, or a private registry without credentials. Crash loop back-off means the container keeps starting and exiting, so read the logs of the previous run. Running but not ready means the readiness probe is failing, for example because the database is unreachable. And OOM killed means the container went over its memory limit.
 
 ## 7. The ecosystem around it
 
-Kubernetes is deliberately a core plus extension points. The most important ones:
+Kubernetes itself is deliberately small: pods, services, scheduling. Everything else comes from a large ecosystem around it, most of it under the CNCF.
 
-**Custom Resources and Operators.** You can teach the API server new kinds of objects with a
-**CustomResourceDefinition (CRD)**, and write a controller that reconciles them. An **operator** is
-such a controller with domain knowledge: a Postgres operator that turns a `PostgresCluster`
-object into a replicated, backed-up database. Argo CD itself is configured through CRDs
-(`Application`, `AppProject`).
+Custom resources and operators let you teach Kubernetes new kinds of objects. An operator is a controller with expert knowledge. A Postgres operator, for example, can turn one short object describing a database cluster into replicated, backed-up Postgres, by creating the StatefulSets, Services and Secrets for you.
 
-**Packaging and templating.** Raw YAML gets repetitive across environments.
-- **Kustomize** (built into kubectl as `kubectl apply -k`): a base set of manifests plus
-  per-environment *overlays* that patch them. No templating language.
-- **Helm**: a package manager. A *chart* is a set of templated manifests plus a `values.yaml`; you
-  install it with different values per environment. Most third-party software ships as a Helm
-  chart.
+For packaging, there are two tools. Kustomize takes a base set of manifests and patches them per environment, without any templating language. Helm is a package manager. A Helm chart is a blueprint of an app's whole infrastructure: all its manifests with blanks in them, plus a values file to fill in those blanks. The chart doesn't contain the image itself. It points to it. If you wanted to hand snip to ten other people, the image alone wouldn't be enough, they'd also need the Deployments, Services, database, secrets and routes. A chart packages all of that, with a version number, so they can install it, configure it, upgrade it and roll it back. Charts are packages, not boilerplate. You install them, you don't copy them. Most third-party software, like Envoy Gateway, the metrics server or Argo CD, ships as a Helm chart, stored in chart repositories or in the same registries as images. Artifact Hub is the catalogue to search them, a bit like npm for Kubernetes.
 
-**GitOps.** **Argo CD** and **Flux** run inside the cluster, watch a Git repository, and keep the
-cluster in sync with it. This turns the reconciliation idea up one level: Git is the desired
-state for the *whole cluster*. Deploys become pull requests; rollbacks become reverts; drift is
-detected and corrected automatically.
+GitOps tools like Argo CD and Flux run inside the cluster, watch a Git repository, and keep the cluster in sync with it. It's the reconciliation idea one level up: Git is the desired state for the whole cluster. Deploys become pull requests, rollbacks become reverts, and drift is detected and corrected automatically.
 
-**Policy.** **Kyverno** and **OPA Gatekeeper** act as admission controllers: "reject any pod
-running as root", "require resource limits", "only images from our registry". On AKS, Azure
-Policy builds on Gatekeeper.
+Policy tools like Kyverno check every object before it's accepted, with rules like: no pods running as root, every container needs resource limits, and only images from our own registry.
 
-**Observability.** **Prometheus** (metrics) and **Grafana** (dashboards), **OpenTelemetry** for
-traces, and log pipelines (Loki, Azure Monitor/Container Insights).
-
-**Certificates.** **cert-manager** requests and renews TLS certificates (for example from Let's
-Encrypt) for your Ingresses and Gateways: Caddy's automatic HTTPS from module 07, done the
-Kubernetes way.
-
-**Service mesh.** Istio, Linkerd, Cilium: mutual TLS between services, fine-grained traffic
-control, and telemetry, without changing app code.
-
----
+For observability there's Prometheus for metrics, Grafana for dashboards, OpenTelemetry for traces, and Loki for logs. Cert-manager requests and renews TLS certificates, for example from Let's Encrypt. And service meshes like Istio, Linkerd and Cilium add encrypted traffic between services and fine-grained traffic control, without changing app code.
 
 ## 8. Flavours of Kubernetes
 
-Kubernetes is a specification with a conformance test suite. Many distributions pass it:
+Kubernetes is a specification with a test suite, and many distributions pass it.
 
-| Flavour | Who runs the control plane | Typical use | In this course |
-|---|---|---|---|
-| **kind** | You, in a container | Local development, CI tests | modules 08–18 |
-| **minikube** | You, in a VM or container | Local development | (alternative to kind) |
-| **k3s** | You; a single lightweight binary | Small servers, edge, homelabs | module 19, on your droplet |
-| **AKS / EKS / GKE** | The cloud provider (managed) | Production | modules 20–21 (AKS) |
-| **OpenShift, Rancher, Tanzu** | Vendor-supported platforms | Enterprises wanting a full platform | — |
+kind runs a whole cluster inside containers on your laptop, and it's what this course uses from module eight onwards. Minikube is a similar alternative. k3s is a single lightweight program for small servers and homelabs, and you'll run it on your droplet. And then there are the managed clusters from the big clouds, like AKS on Azure, where the cloud provider runs the control plane for you. Vendors like Red Hat with OpenShift sell complete platforms on top.
 
-Your manifests are portable across all of them. What differs is the *edges*: load balancers,
-storage classes, identity, and which add-ons come pre-installed.
+Your manifests work on all of them. What differs are the edges: load balancers, storage, identity, and which add-ons come pre-installed.
 
----
+## 9. When, and when not, to use Kubernetes
 
-## 9. When (not) to use Kubernetes
+Kubernetes is a good fit when many services and teams share infrastructure, when you need updates without downtime, self-healing and autoscaling, and when you want one standard way to deploy everything, with GitOps, policy and observability on top.
 
-**Good fit:**
-- many services and teams sharing infrastructure;
-- you need zero-downtime deploys, self-healing, and autoscaling;
-- you want one standard way to deploy everything, with GitOps, policy, and observability on top.
+It's probably overkill for one small app on one server with a single team. Compose or a hosted platform is simpler there. And it's a bad idea when nobody owns the platform. Kubernetes moves complexity, it doesn't remove it. Managed offerings like AKS, and platform teams, exist precisely to absorb that complexity, so app teams don't have to.
 
-**Probably overkill:**
-- one small app, one server, a single team: Compose (module 06) or a PaaS is simpler;
-- you have no one to own the platform. Kubernetes moves complexity; it doesn't remove it.
-  Managed offerings (AKS) and platform teams exist precisely to absorb that complexity so app
-  teams don't have to.
+## 10. How snip maps onto Kubernetes
 
----
+In Compose, the snip API was one service. In Kubernetes, it's a Deployment with a Service in front, and an autoscaler that decides how many copies run. The web frontend is also a Deployment, with its nginx configuration and its page coming from ConfigMaps. The database becomes a StatefulSet with its own storage claim and a headless Service. The password moves from an env file to a Secret, and later to Key Vault. Caddy's role as the front door with HTTPS is taken over by the Gateway and cert-manager. The Compose health checks become liveness and readiness probes.
 
-## 10. How snip will map onto Kubernetes
+Two things from Compose disappear. Depends on doesn't exist in Kubernetes, so apps must cope with a dependency being briefly unavailable. And restart unless stopped isn't needed, because the reconciliation loop does that for you.
 
-| snip piece | Compose (module 04/06) | Kubernetes (part 2 onwards) |
-|---|---|---|
-| API | service `api`, `image: ghcr.io/…/snip-api` | **Deployment** `snip-api` + **Service** `snip-api` |
-| Database | service `db`, volume `db-data` | **StatefulSet** `snip-db` + **PVC** + headless **Service** |
-| Web (nginx) | service `web`, bind mounts | **Deployment** `snip-web` + **ConfigMap** for `nginx.conf` and the page |
-| Password | `.env` | **Secret** (later: from Key Vault) |
-| Front door + HTTPS | Caddy, ports 80/443 | **Gateway/Ingress** + **cert-manager** |
-| Health | `healthcheck` | **liveness/readiness probes** on `/health` and `/health/db` |
-| `depends_on` | yes | **doesn't exist**: apps must tolerate dependencies being temporarily unavailable |
-| Restart on reboot | `restart: unless-stopped` | built in: the reconciliation loop |
-| Deploy | `docker compose up -d` via SSH (push) | Argo CD syncs from Git (pull) |
+Finally, deploying changes from pushing over SSH, to Argo CD pulling the desired state from Git.
 
----
+## 11. Further reading
 
-## 11. Glossary
-
-| Term | Meaning |
-|---|---|
-| **Cluster** | Control plane + nodes, managed as one system. |
-| **Node** | A machine (VM or physical) that runs pods. |
-| **Control plane** | API server, etcd, scheduler, controllers: the cluster's brain. |
-| **Pod** | One or more containers sharing network and storage; the unit of scheduling. |
-| **Workload** | Something that runs pods: Deployment, StatefulSet, DaemonSet, Job, CronJob. |
-| **Controller** | A loop that reconciles desired state with actual state for one kind of object. |
-| **Manifest** | A YAML (or JSON) file describing one or more objects. |
-| **Label / selector** | Key-value tag / query over tags; how objects find each other. |
-| **Namespace** | A scope for names, access control and quotas within a cluster. |
-| **Service** | Stable name and virtual IP in front of a set of pods. |
-| **Ingress / Gateway** | HTTP(S) entry from outside the cluster to Services. |
-| **ConfigMap / Secret** | Configuration / sensitive configuration, injected into pods. |
-| **PV / PVC / StorageClass** | Storage / a request for storage / a recipe for creating storage. |
-| **Probe** | A health check the kubelet runs (liveness, readiness, startup). |
-| **Requests / limits** | Guaranteed / maximum CPU and memory for a container. |
-| **RBAC** | Role-based access control: who may do what to which resources. |
-| **CRD / Operator** | A new object type / a controller that manages it with domain knowledge. |
-| **Context** | A kubeconfig entry: which cluster, which user, which default namespace. |
-| **Reconciliation** | Continuously making actual state match desired state. |
-| **GitOps** | Using Git as the desired state for the cluster, synced by a tool like Argo CD. |
-
----
-
-## 12. Further reading
-
-- **Official documentation:** <https://kubernetes.io/docs/>. The *Concepts* section is excellent
-  and pairs well with this document.
-- **kubectl reference / cheat sheet:** <https://kubernetes.io/docs/reference/kubectl/quick-reference/>
-- **The CKAD curriculum** (what the exam covers): <https://github.com/cncf/curriculum>
-- **Gateway API:** <https://gateway-api.sigs.k8s.io/>
-- **Argo CD:** <https://argo-cd.readthedocs.io/>
-- **kind:** <https://kind.sigs.k8s.io/>
-
-During the CKAD exam you may use `kubernetes.io/docs`, so getting comfortable navigating it now
-pays off later.
+The official documentation at kubernetes dot io is excellent, especially the Concepts section, and it pairs well with this introduction. You're allowed to use it during the CKAD exam, so getting comfortable with it now pays off later. The Gateway API, Argo CD and kind each have their own documentation sites as well.

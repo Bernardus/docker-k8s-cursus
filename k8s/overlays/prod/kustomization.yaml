@@ -1,0 +1,12 @@
+# Omgeving prod: de base zoals hij is, met een vaste versie.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: default
+resources:
+  - ../../base
+labels:
+  - pairs:
+      env: prod
+images:
+  - name: ghcr.io/bernardus/snip-api
+    newTag: sha-9743b8d          # prod draait een vaste, geteste versie, nooit latest

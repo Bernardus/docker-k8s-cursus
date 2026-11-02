@@ -1,0 +1,10 @@
+# Argo CD in kind: alleen wat we nodig hebben.
+configs:
+  params:
+    server.insecure: true          # geen eigen HTTPS: we komen binnen via port-forward
+  cm:
+    timeout.reconciliation: 60s    # elke minuut in Git kijken (standaard: 2 minuten)
+dex:
+  enabled: false                   # geen inloggen via GitHub of Entra ID, alleen admin
+notifications:
+  enabled: false                   # geen berichten naar Slack of Teams

@@ -45,10 +45,10 @@ secrets, caching, healthchecks en schalen.
 | | 11 | [ConfigMaps en Secrets](modules/11-configmaps-en-secrets/): de website erbij, wachtwoord in een Secret `CKAD` | ✅ klaar |
 | | 12 | [Opslag](modules/12-opslag/): de database in het cluster, met een PVC en een StatefulSet `CKAD` | ✅ klaar |
 | | 13 | [Probes, resources en autoscaling](modules/13-probes-en-schalen/): gezond of niet, grenzen aan CPU en geheugen, en meeschalen bij drukte `CKAD` | ✅ klaar |
-| | 14 | Helm (en Kustomize) `CKAD` | 🔜 |
-| | 15 | Namespaces, RBAC, quota, NetworkPolicies: meerdere teams in één cluster `CKAD` | 🔜 |
-| | 16 | Debuggen als een pro: events, logs, k9s, klassieke fouten `CKAD` | 🔜 |
-| **3 · GitOps met Argo CD** (lokaal) | 17 | Argo CD: Applications, sync, self-heal, rollback | 🔜 |
+| | 14 | [Kustomize en Helm](modules/14-kustomize-en-helm/): één base met de omgevingen test en prod, ConfigMaps uit `app/`, en software installeren met Helm `CKAD` | ✅ klaar |
+| | 15 | [Teams en grenzen](modules/15-teams-en-grenzen/): RBAC, quota en NetworkPolicies voor meerdere teams in één cluster, plus Cilium met laag 7-policies en Hubble `CKAD` | ✅ klaar |
+| | 16 | [Debuggen als een pro](modules/16-debuggen/): een vaste aanpak, events, logs, `kubectl debug`, k9s, en zes storingen oplossen `CKAD` | ✅ klaar (optioneel) |
+| **3 · GitOps met Argo CD** (lokaal) | 17 | [Argo CD](modules/17-argo-cd/): Applications, test automatisch en prod met de hand, self-heal, prune, rollback via Git | ✅ klaar |
 | | 18 | CI + CD: Actions bouwt → nieuwe tag in Git → Argo CD rolt uit, met omgevingen dev/prod | 🔜 |
 | **4 · Live met Kubernetes** | 19 | **4a** k3s op je droplet (dezelfde als in module 06): HTTPS met cert-manager | 🔜 |
 | | 20 | **4b** AKS met Terraform: ACR, OIDC vanuit GitHub, wegwerpcluster | 🔜 |

@@ -1,0 +1,62 @@
+# Wie mag met wie praten? Eerst: niemand. Daarna alleen wat snip nodig heeft.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}                  # alle pods in deze namespace...
+  policyTypes: [Ingress]           # ...nemen geen binnenkomend verkeer aan
+---
+# De voordeur (Envoy) mag naar de website.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: snip-web
+spec:
+  podSelector:
+    matchLabels:
+      app: snip-web
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - port: 80
+---
+# De API: van de voordeur (/api) en van de website (korte links).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: snip-api
+spec:
+  podSelector:
+    matchLabels:
+      app: snip-api
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+        - podSelector:
+            matchLabels:
+              app: snip-web
+      ports:
+        - port: 3000
+---
+# De database: alleen de API, uit dezelfde namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: snip-db
+spec:
+  podSelector:
+    matchLabels:
+      app: snip-db
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: snip-api
+      ports:
+        - port: 5432

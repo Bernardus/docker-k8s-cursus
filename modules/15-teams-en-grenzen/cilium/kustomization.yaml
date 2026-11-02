@@ -1,0 +1,25 @@
+# snip in het Cilium-cluster: de base, zonder voordeur (er is daar geen Envoy Gateway).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: snip
+resources:
+  - ../../../k8s/base
+patches:
+  - patch: |-
+      $patch: delete
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata:
+        name: snip
+  - patch: |-
+      $patch: delete
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: snip-api
+  - patch: |-
+      $patch: delete
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: snip-web

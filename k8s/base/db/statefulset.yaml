@@ -28,11 +28,21 @@ spec:
                 secretKeyRef:
                   name: snip-db
                   key: password
+          readinessProbe:              # neemt Postgres verbindingen aan?
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
+            periodSeconds: 5
           volumeMounts:
             - name: data                        # de opslag (zie volumeClaimTemplates)
               mountPath: /var/lib/postgresql
             - name: init                        # links.sql, alleen bij de eerste start
               mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
       volumes:
         - name: init
           configMap:
