@@ -9,7 +9,7 @@ labels:
       env: test                  # een etiket op alles, handig om te zoeken
 images:
   - name: ghcr.io/bernardus/snip-api
-    newTag: latest               # test draait altijd de nieuwste versie
+    newTag: latest               # zet de pipeline, niet met de hand (module 18)
 patches:                         # schrijf alleen op wat anders is
   - patch: |-
       apiVersion: autoscaling/v2
